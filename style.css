@@ -467,20 +467,17 @@ img {
 .image-container {
   max-width: var(--reader-max-w);
   margin: 0 auto;
-  /* no gap between pages – webtoon style */
+  font-size: 0;        /* kills inline-block gap between images */
+  line-height: 0;
 }
 
 .page-img {
   width: 100%;
   display: block;
-  /* Let image natural height show */
   height: auto;
-  /* Tiny gap between pages */
-  margin-bottom: 2px;
-}
-
-.page-img:last-child {
-  margin-bottom: 0;
+  margin: 0;
+  padding: 0;
+  vertical-align: top; /* safety – removes any sub-pixel baseline gap */
 }
 
 /* ─────────────────────────────

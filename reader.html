@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reader – Manhwa Reader</title>
+  <meta name="description" content="Webtoon-style chapter reader with vertical scrolling." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="reader-page">
+
+  <!-- ─── Progress bar ─── -->
+  <div id="progress-bar" class="progress-bar">
+    <div id="progress-fill" class="progress-fill"></div>
+  </div>
+
+  <!-- ─── Sticky top navbar ─── -->
+  <nav id="top-nav" class="top-nav">
+    <div class="nav-inner">
+      <!-- Left: back home -->
+      <a href="index.html" class="nav-btn nav-home" title="Back to library" id="btn-home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </a>
+
+      <!-- Center: chapter selector -->
+      <div class="nav-center">
+        <button class="nav-btn nav-prev" id="btn-prev" title="Previous chapter">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+
+        <div class="chapter-selector-wrap">
+          <select id="chapter-select" class="chapter-select" title="Jump to chapter"></select>
+        </div>
+
+        <button class="nav-btn nav-next" id="btn-next" title="Next chapter">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <!-- Right: page count -->
+      <div class="nav-page-info" id="page-info">—</div>
+    </div>
+  </nav>
+
+  <!-- ─── Reader area ─── -->
+  <main class="reader-main">
+    <div id="loading-screen" class="loading-screen">
+      <div class="spinner"></div>
+      <p>Loading chapter…</p>
+    </div>
+
+    <div id="image-container" class="image-container hidden"></div>
+
+    <div id="error-screen" class="error-screen hidden">
+      <div class="error-icon">⚠️</div>
+      <h2>Failed to load chapter</h2>
+      <p id="error-msg"></p>
+    </div>
+  </main>
+
+  <!-- ─── Floating side buttons ─── -->
+  <div class="float-nav" id="float-nav">
+    <button class="float-btn float-prev" id="float-prev" title="Previous chapter">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      <span>Prev</span>
+    </button>
+    <button class="float-btn float-top" id="float-top" title="Back to top">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+      <span>Top</span>
+    </button>
+    <button class="float-btn float-next" id="float-next" title="Next chapter">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      <span>Next</span>
+    </button>
+  </div>
+
+  <!-- ─── Bottom navigation ─── -->
+  <footer class="bottom-nav" id="bottom-nav">
+    <button class="bottom-btn" id="bottom-prev">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Previous Chapter
+    </button>
+    <a href="index.html" class="bottom-btn bottom-home">All Chapters</a>
+    <button class="bottom-btn" id="bottom-next">
+      Next Chapter
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+  </footer>
+
+  <script src="reader.js"></script>
+</body>
+</html>

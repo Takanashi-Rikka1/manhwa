@@ -1,0 +1,10 @@
+# Auto-generated chapters.json – don't edit manually
+# (re-generate with: node generate_index.js)
+# chapters.json is intentionally committed so GitHub Pages can serve it
+
+# Node modules (if any are ever added)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db

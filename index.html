@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manhwa Reader</title>
+  <meta name="description" content="Personal webtoon reader – browse and read your manhwa collection." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="home-page">
+
+  <!-- ─── Header ─── -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">📚</span>
+        <span class="logo-text">Manhwa Reader</span>
+      </div>
+      <button id="continue-badge" class="continue-badge hidden" type="button">
+        <span class="continue-icon">▶</span>
+        <span id="continue-text">Continue Reading</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ─── Main ─── -->
+  <main>
+    <div id="loading-screen" class="loading-screen">
+      <div class="spinner"></div>
+      <p>Loading library…</p>
+    </div>
+
+    <div id="error-screen" class="error-screen hidden">
+      <div class="error-icon">⚠️</div>
+      <h2>Could not load chapters</h2>
+      <p id="error-msg"></p>
+    </div>
+
+    <div id="library" class="library hidden"></div>
+  </main>
+
+  <script src="home.js"></script>
+</body>
+</html>

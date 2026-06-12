@@ -1,22 +1,26 @@
 /**
- * reader.js – Webtoon chapter reader logic
+ * reader.js – Webtoon chapter reader (canvas-stitched)
  *
- * Image path convention (relative to website/ root):
- *   chapters/<ChapterName>/<filename>
+ * Instead of stacking <img> elements (which always produce a
+ * sub-pixel boundary), we draw batches of images onto a single
+ * <canvas> each. Multiple canvases still touch seamlessly because
+ * canvas elements have no baseline / line-height artefacts.
+ *
+ * CANVAS_BATCH   – how many source images share one canvas.
+ *                  Lower = faster first-paint; Higher = fewer canvases.
  *
  * Features:
- *  - Reads ?manhwa=...&chapter=... from URL
- *  - Vertical webtoon scroll strip
- *  - Sticky nav: Prev / Chapter select / Next
- *  - Floating side buttons: Prev / Top / Next
+ *  - URL params: ?manhwa=...&chapter=...
+ *  - Sticky nav: ← chapter-select →
+ *  - Floating buttons: Prev / Top / Next
  *  - Bottom footer navigation
- *  - Reading progress bar
- *  - Page counter (visible page / total)
+ *  - Reading progress bar (scroll %)
+ *  - Page counter (approx. current page / total)
  *  - Saves & restores scroll position via localStorage
- *  - Keyboard shortcuts: ← / → or A / D
- *  - Lazy image loading
+ *  - Keyboard: ← / → or A / D
  */
 
+const CANVAS_BATCH    = 6;          // images drawn per canvas element
 const LS_KEY_PROGRESS = "manhwa_progress";
 
 // ── State ─────────────────────────────────────────────────────────────────
@@ -36,7 +40,6 @@ function readerUrl(manhwa, chapterName) {
   return `reader.html?manhwa=${encodeURIComponent(manhwa)}&chapter=${encodeURIComponent(chapterName)}`;
 }
 
-// Images at: chapters/<ChapterName>/<filename>  (relative to website/)
 function imageSrc(chapterName, filename) {
   return `chapters/${encodeURIComponent(chapterName)}/${encodeURIComponent(filename)}`;
 }
@@ -45,11 +48,7 @@ function imageSrc(chapterName, filename) {
 
 function saveProgress(manhwa, chapterName, scrollY) {
   try {
-    localStorage.setItem(LS_KEY_PROGRESS, JSON.stringify({
-      manhwa,
-      chapter: chapterName,
-      scroll:  scrollY,
-    }));
+    localStorage.setItem(LS_KEY_PROGRESS, JSON.stringify({ manhwa, chapter: chapterName, scroll: scrollY }));
   } catch {}
 }
 
@@ -61,57 +60,112 @@ function getSavedScroll(manhwa, chapterName) {
   return 0;
 }
 
+// ── Image loader ──────────────────────────────────────────────────────────
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload  = () => resolve(img);
+    img.onerror = () => reject(new Error(`Failed to load: ${src}`));
+    img.src     = src;
+  });
+}
+
+// ── Canvas stitching ──────────────────────────────────────────────────────
+
+/**
+ * Draw a batch of already-loaded HTMLImageElements onto one canvas.
+ * All images are scaled to the width of the first image so that the
+ * strip is uniform — the result is pixel-perfect with zero seams.
+ */
+function drawBatchToCanvas(imgs) {
+  // Use the natural width of the first image as the reference width
+  const refWidth = imgs[0].naturalWidth;
+
+  const scaledHeights = imgs.map(img =>
+    Math.round(img.naturalHeight * (refWidth / img.naturalWidth))
+  );
+  const totalHeight = scaledHeights.reduce((a, b) => a + b, 0);
+
+  const canvas    = document.createElement("canvas");
+  canvas.width    = refWidth;
+  canvas.height   = totalHeight;
+  canvas.className = "webtoon-canvas";
+
+  const ctx = canvas.getContext("2d");
+  let y = 0;
+  imgs.forEach((img, i) => {
+    ctx.drawImage(img, 0, y, refWidth, scaledHeights[i]);
+    y += scaledHeights[i];
+  });
+
+  return canvas;
+}
+
+// ── Render chapter ────────────────────────────────────────────────────────
+
+async function renderChapter(chapter) {
+  const container = document.getElementById("image-container");
+  const loadingEl = document.getElementById("loading-screen");
+
+  container.innerHTML = "";
+  container.classList.add("hidden");
+  loadingEl.classList.remove("hidden");
+
+  // Split image list into batches
+  const batches = [];
+  for (let i = 0; i < chapter.images.length; i += CANVAS_BATCH) {
+    batches.push(chapter.images.slice(i, i + CANVAS_BATCH));
+  }
+
+  let firstBatch = true;
+
+  for (const batch of batches) {
+    let imgs;
+    try {
+      imgs = await Promise.all(batch.map(f => loadImage(imageSrc(chapter.name, f))));
+    } catch (err) {
+      console.warn("Batch load error:", err);
+      continue;
+    }
+
+    const canvas = drawBatchToCanvas(imgs);
+    container.appendChild(canvas);
+
+    // Show content as soon as the first batch is ready
+    if (firstBatch) {
+      firstBatch = false;
+      loadingEl.classList.add("hidden");
+      container.classList.remove("hidden");
+    }
+  }
+}
+
 // ── Progress bar & page counter ───────────────────────────────────────────
 
 const progressFill = document.getElementById("progress-fill");
 const pageInfoEl   = document.getElementById("page-info");
-
-function getVisiblePageIndex() {
-  const container = document.getElementById("image-container");
-  if (!container) return 0;
-  const imgs = container.querySelectorAll(".page-img");
-  const midY = window.innerHeight / 2;
-  for (let i = imgs.length - 1; i >= 0; i--) {
-    if (imgs[i].getBoundingClientRect().top <= midY) return i;
-  }
-  return 0;
-}
 
 function updateProgress() {
   const chapter = chapters[currentIndex];
   if (!chapter) return;
 
   const scrollTop = window.scrollY;
-  const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-  const pct       = maxScroll > 0 ? (scrollTop / maxScroll) * 100 : 0;
+  const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+  const pct       = (scrollTop / maxScroll) * 100;
 
   progressFill.style.width = `${pct.toFixed(1)}%`;
 
-  const visIdx = getVisiblePageIndex();
-  pageInfoEl.textContent = `${visIdx + 1} / ${chapter.images.length}`;
+  // Approximate page number from scroll percentage
+  const approxPage = Math.min(
+    chapter.images.length,
+    Math.round((scrollTop / maxScroll) * chapter.images.length) + 1
+  );
+  pageInfoEl.textContent = `${approxPage} / ${chapter.images.length}`;
 
   saveProgress(currentManhwa, chapter.name, scrollTop);
 
-  // Show float nav after scrolling down a bit
-  const floatNav = document.getElementById("float-nav");
-  floatNav.classList.toggle("visible", scrollTop > 200);
-}
-
-// ── Render images ─────────────────────────────────────────────────────────
-
-function renderChapter(chapter) {
-  const container = document.getElementById("image-container");
-  container.innerHTML = "";
-
-  chapter.images.forEach((filename, idx) => {
-    const img     = document.createElement("img");
-    img.className = "page-img";
-    img.alt       = `Page ${idx + 1}`;
-    img.loading   = "lazy";
-    img.decoding  = "async";
-    img.src       = imageSrc(chapter.name, filename);
-    container.appendChild(img);
-  });
+  document.getElementById("float-nav").classList.toggle("visible", scrollTop > 200);
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────
@@ -137,13 +191,12 @@ function buildSelect() {
 function updateNavButtons() {
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < chapters.length - 1;
-
-  document.getElementById("btn-prev").disabled    = !hasPrev;
-  document.getElementById("btn-next").disabled    = !hasNext;
-  document.getElementById("float-prev").disabled  = !hasPrev;
-  document.getElementById("float-next").disabled  = !hasNext;
-  document.getElementById("bottom-prev").disabled = !hasPrev;
-  document.getElementById("bottom-next").disabled = !hasNext;
+  ["btn-prev", "float-prev", "bottom-prev"].forEach(id => {
+    document.getElementById(id).disabled = !hasPrev;
+  });
+  ["btn-next", "float-next", "bottom-next"].forEach(id => {
+    document.getElementById(id).disabled = !hasNext;
+  });
 }
 
 function wireButtons() {
@@ -164,7 +217,7 @@ function wireKeyboard() {
   });
 }
 
-// ── Scroll handler (throttled via rAF) ───────────────────────────────────
+// ── Scroll (throttled) ────────────────────────────────────────────────────
 
 let scrollTick = false;
 window.addEventListener("scroll", () => {
@@ -179,62 +232,52 @@ window.addEventListener("scroll", () => {
 async function init() {
   const { manhwa, chapter } = getParams();
 
-  const loadingEl = document.getElementById("loading-screen");
-  const errorEl   = document.getElementById("error-screen");
-  const errorMsg  = document.getElementById("error-msg");
-  const container = document.getElementById("image-container");
+  const errorEl  = document.getElementById("error-screen");
+  const errorMsg = document.getElementById("error-msg");
 
   function showError(msg) {
-    loadingEl.classList.add("hidden");
+    document.getElementById("loading-screen").classList.add("hidden");
     errorEl.classList.remove("hidden");
     errorMsg.textContent = msg;
   }
 
   if (!manhwa || !chapter) {
-    showError("Missing manhwa or chapter in URL. Go back to the home page.");
+    showError("Missing manhwa or chapter in URL.");
     return;
   }
 
-  // Load chapters.json
   try {
     const res = await fetch("chapters.json");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     allData = await res.json();
   } catch (err) {
-    showError(`Could not load chapters.json: ${err.message}. Run: node generate_index.js`);
+    showError(`Could not load chapters.json: ${err.message}`);
     return;
   }
 
   currentManhwa = manhwa;
   chapters      = allData[manhwa] || [];
 
-  if (!chapters.length) {
-    showError(`Manhwa "${manhwa}" not found in chapters.json.`);
-    return;
-  }
+  if (!chapters.length) { showError(`Manhwa "${manhwa}" not found.`); return; }
 
-  currentIndex = chapters.findIndex((c) => c.name === chapter);
-  if (currentIndex === -1) {
-    showError(`Chapter "${chapter}" not found.`);
-    return;
-  }
+  currentIndex = chapters.findIndex(c => c.name === chapter);
+  if (currentIndex === -1) { showError(`Chapter "${chapter}" not found.`); return; }
 
-  const currentChapter = chapters[currentIndex];
-  document.title = `${currentChapter.name} – ${manhwa}`;
+  const current = chapters[currentIndex];
+  document.title = `${current.name} – ${manhwa}`;
 
-  renderChapter(currentChapter);
   buildSelect();
   updateNavButtons();
   wireButtons();
   wireKeyboard();
 
-  loadingEl.classList.add("hidden");
-  container.classList.remove("hidden");
+  // Render (async – shows content as batches complete)
+  await renderChapter(current);
 
-  // Restore saved scroll
-  const savedScroll = getSavedScroll(manhwa, chapter);
-  if (savedScroll > 100) {
-    setTimeout(() => window.scrollTo({ top: savedScroll, behavior: "instant" }), 80);
+  // Restore scroll position
+  const saved = getSavedScroll(manhwa, chapter);
+  if (saved > 100) {
+    setTimeout(() => window.scrollTo({ top: saved, behavior: "instant" }), 80);
   }
 
   updateProgress();

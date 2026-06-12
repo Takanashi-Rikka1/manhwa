@@ -467,17 +467,22 @@ img {
 .image-container {
   max-width: var(--reader-max-w);
   margin: 0 auto;
-  font-size: 0;        /* kills inline-block gap between images */
-  line-height: 0;
+  display: block;
+  overflow: hidden;
 }
 
-.page-img {
+/* Each stitched canvas block */
+.webtoon-canvas {
   width: 100%;
+  height: auto;        /* scale proportionally via CSS */
   display: block;
-  height: auto;
   margin: 0;
   padding: 0;
-  vertical-align: top; /* safety – removes any sub-pixel baseline gap */
+  border: none;
+  outline: none;
+  /* Prevent sub-pixel gaps at canvas boundaries */
+  vertical-align: top;
+  image-rendering: auto;
 }
 
 /* ─────────────────────────────
